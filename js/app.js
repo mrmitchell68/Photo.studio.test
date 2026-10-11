@@ -6,7 +6,7 @@ import { icon, hydrateIcons } from './icons.js';
 import { EMOJI, SVG_STAMPS, svgUrl, emojiDataURL, FONTS, COLORS, GRADIENTS } from './stamps.js';
 
 // ---------------- tiny on-device debug log (no keys, no image data) ----------------
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v9-spec-sheet';
 const DBG_KEY = 'photoapp.debug.v1';
 const DBG = {
   read() { try { return JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); } catch (e) { return []; } },
@@ -749,9 +749,8 @@ const PANELS = {
   ai(pn) {
     const key = AI.hasKey();
     pn.appendChild(h(`<div><div class="sec">Magic: one tap, on-device, no key needed</div>
-      <div class="hscroll"><button class="chip ${S.cur.edit.auto ? 'on' : ''}" id="mAuto">${icon('wand')} Auto-enhance</button>
+      <button class="big-btn primary" id="mStudio" style="width:100%;margin:10px 0 14px;min-height:52px">${icon('wand')} Professional Spec Sheet</button><div class="hscroll"><button class="chip ${S.cur.edit.auto ? 'on' : ''}" id="mAuto">${icon('wand')} Auto-enhance</button>
       <button class="chip" id="mBg">${icon('sparkle')} Remove background</button>
-      <button class="chip primary" id="mStudio">${icon('wand')} Professional Spec Sheet</button>
       <button class="chip" id="mAll">${icon('copy')} Apply edits to all (${S.photos.length})</button></div>
       <div class="sec">AI Assistant ${key ? `<span class="tag ${AI.providerInfo(AI.loadSettings().provider).badge === 'Free' ? 'free' : ''}">${AI.providerInfo(AI.loadSettings().provider).label} · ${AI.providerInfo(AI.loadSettings().provider).badge || 'custom'}</span>` : '<span class="tag">optional</span>'}</div>
       ${key ? '' : '<p class="note">Say or type what you want and the assistant does the edits. It needs an API key: <b>Google Gemini</b> and <b>Groq</b> are free (no credit card). Tap AI settings to set one up. Everything else works without it.</p>'}
