@@ -765,7 +765,7 @@ const PANELS = {
     $('#mBg', pn).onclick = () => removeBg('precise');
     $('#mAll', pn).onclick = () => applyToAllSheet();
     $('#aiSet', pn).onclick = () => aiSettingsSheet();
-    ['Make it brighter and more colorful', 'Black and white, square crop', 'Blur the background', 'Warm sunset look with a ☀️ stamp top right', 'Add “Best Day Ever” at the bottom', 'Remove the background and put a soft blue gradient behind'].forEach(x => {
+    ['Make it brighter and more colorful', 'Black and white, square crop', 'Blur the background', 'Warm sunset look with a ☀️ stamp top right', 'Add “Best Day Ever” at the bottom', 'Remove the background and put a clean light-gray studio background behind'].forEach(x => {
       const b = h(`<button class="chip ex"></button>`); b.textContent = x; b.onclick = () => { $('#aiInput').value = x; S.aiDraft = x; if (!MANUAL) $('#aiInput').focus({ preventScroll: true }); }; $('#aiEx', pn).appendChild(b);
     });
     const ai = $('#aiInput', pn); ai.value = S.aiDraft || ''; ai.addEventListener('input', () => { S.aiDraft = ai.value; });
@@ -931,10 +931,10 @@ async function removeBg(method = 'precise', silent) {
   busy(true, 'Preparing background removal…');
   try {
     const log = [];
-    const ok = await applyBackground(p, { type: 'transparent' }, log);
+    const ok = await applyBackground(p, { type: 'color', color: '#e6e6e6' }, log);
     if (!ok) { const m = (log[0] || 'Background removal failed').replace(/^• /, ''); if (silent) throw new Error(m); toast(m, 5000); return false; }
     await renderBase();
-    if (!silent) { commit(); if (!MANUAL) { toast('Background removed. Ask the AI for a new one, e.g. “sunset gradient behind”'); renderPanel(); } else { toast('Background removed. Pick a new one below'); if (S.tool !== 'bg') selectTool('bg'); else renderPanel(); } }
+    if (!silent) { commit(); if (!MANUAL) { toast('Background removed with a light-gray studio background'); renderPanel(); } else { toast('Light-gray background applied. You can change it below'); if (S.tool !== 'bg') selectTool('bg'); else renderPanel(); } }
     return true;
   } finally { busy(false); }
 }
