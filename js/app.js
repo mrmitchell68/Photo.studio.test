@@ -751,6 +751,7 @@ const PANELS = {
     pn.appendChild(h(`<div><div class="sec">Magic: one tap, on-device, no key needed</div>
       <div class="hscroll"><button class="chip ${S.cur.edit.auto ? 'on' : ''}" id="mAuto">${icon('wand')} Auto-enhance</button>
       <button class="chip" id="mBg">${icon('sparkle')} Remove background</button>
+      <button class="chip primary" id="mStudio">${icon('wand')} Professional Spec Sheet</button>
       <button class="chip" id="mAll">${icon('copy')} Apply edits to all (${S.photos.length})</button></div>
       <div class="sec">AI Assistant ${key ? `<span class="tag ${AI.providerInfo(AI.loadSettings().provider).badge === 'Free' ? 'free' : ''}">${AI.providerInfo(AI.loadSettings().provider).label} · ${AI.providerInfo(AI.loadSettings().provider).badge || 'custom'}</span>` : '<span class="tag">optional</span>'}</div>
       ${key ? '' : '<p class="note">Say or type what you want and the assistant does the edits. It needs an API key: <b>Google Gemini</b> and <b>Groq</b> are free (no credit card). Tap AI settings to set one up. Everything else works without it.</p>'}
@@ -763,6 +764,8 @@ const PANELS = {
       <div id="aiOut"></div></div>`));
     $('#mAuto', pn).onclick = () => magicAuto();
     $('#mBg', pn).onclick = () => removeBg('precise');
+    $('#mStudio', pn).onclick = () => studioPreset();
+    studioColorPicker(pn);
     $('#mAll', pn).onclick = () => applyToAllSheet();
     $('#aiSet', pn).onclick = () => aiSettingsSheet();
     ['Make it brighter and more colorful', 'Black and white, square crop', 'Blur the background', 'Warm sunset look with a ☀️ stamp top right', 'Add “Best Day Ever” at the bottom', 'Remove the background and put a clean light-gray studio background behind'].forEach(x => {
@@ -884,6 +887,45 @@ async function magicAuto() {
 async function computeMask(p, method) {
   try { const m = await segment(await getPreview(p), method, (msg) => busy(true, msg)); DBG.push('mask', { ok: true, ...segRun }); return m; }
   catch (e) { DBG.push('mask', { ok: false, error: e.message, ...segRun }); throw e; }
+}
+
+const STUDIO_COLORS = [['Light gray','#e6e6e6'],['White','#ffffff'],['Off-white','#f5f3ef'],['Medium gray','#bfc3c7'],['Charcoal','#353a40'],['Black','#101114'],['Pale blue','#e6f1fa'],['Sky blue','#b9daf4'],['Navy','#22364d'],['Soft beige','#eee3d3'],['Pale green','#e3eee7'],['Slate','#8d9ba6']];
+async function studioPreset() {
+  const p = S.cur; if (!p) return;
+  busy(true, 'Preparing spec sheet photo…');
+  try {
+    const log = [];
+    if (!await applyBackground(p, { type: 'color', color: '#e6e6e6' }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
+    p.edit.adj.sharpness = 12;
+    p.edit.auto = null;
+    await renderBase(); commit(); renderPanel();
+    toast('Professional Spec Sheet applied. Choose another color below.');
+  } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
+  finally { busy(false); }
+}
+function studioColorPicker(pn) {
+  const p = S.cur; if (!p) return;
+  const box = h('<div><div class="sec">Studio background colors</div><div class="row" style="flex-wrap:wrap"></div><p class="note">Remove the background first, then select a color.</p></div>');
+  const row = box.querySelector('.row');
+  STUDIO_COLORS.forEach(([name, color]) => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = name;
+    btn.style.borderLeft = '12px solid ' + color;
+    btn.onclick = async () => {
+      if (!p.edit.bg.maskId) { toast('Tap Remove Background or Professional Spec Sheet first'); return; }
+      p.edit.bg.mode = 'color'; p.edit.bg.color = color;
+      await renderBase(); commit(); renderPanel();
+    };
+    row.appendChild(btn);
+  });
+  const custom = h('<label class="row">Custom color <input type="color" value="#e6e6e6" aria-label="Custom background color"></label>');
+  custom.querySelector('input').onchange = async (ev) => {
+    if (!p.edit.bg.maskId) { toast('Remove the background first'); return; }
+    p.edit.bg.mode = 'color'; p.edit.bg.color = ev.target.value;
+    await renderBase(); commit(); renderPanel();
+  };
+  box.appendChild(custom); pn.appendChild(box);
 }
 const NO_SUBJECT_RE = /No person|No clear|Could not separate/;
 // Ensure the photo has a valid subject mask. Returns true when one is available; never changes the photo otherwise.
