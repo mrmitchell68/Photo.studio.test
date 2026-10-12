@@ -6,7 +6,7 @@ import { icon, hydrateIcons } from './icons.js';
 import { EMOJI, SVG_STAMPS, svgUrl, emojiDataURL, FONTS, COLORS, GRADIENTS } from './stamps.js';
 
 // ---------------- tiny on-device debug log (no keys, no image data) ----------------
-const APP_VERSION = 'v9-spec-sheet';
+const APP_VERSION = 'v15-recovery';
 const DBG_KEY = 'photoapp.debug.v1';
 const DBG = {
   read() { try { return JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); } catch (e) { return []; } },
@@ -1399,7 +1399,7 @@ async function boot() {
   const assets = (await DB.all('assets')) || [];
   for (const a of assets) if (a.kind === 'stamp' && a.url) S.assets.set(a.id, { img: null, kind: 'stamp', url: a.url });
   renderGallery();
-  if ('serviceWorker' in navigator && location.protocol === 'https:' || location.hostname === 'localhost') navigator.serviceWorker?.register('sw.js').catch(e => console.warn('SW', e));
+  // Recovery release: pause offline caching while startup issues are diagnosed.
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files); });
   window.__ready = true;
