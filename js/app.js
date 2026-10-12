@@ -892,58 +892,16 @@ async function computeMask(p, method) {
 const STUDIO_COLORS = [['Light gray','#e6e6e6'],['White','#ffffff'],['Off-white','#f5f3ef'],['Medium gray','#bfc3c7'],['Charcoal','#353a40'],['Black','#101114'],['Pale blue','#e6f1fa'],['Sky blue','#b9daf4'],['Navy','#22364d'],['Soft beige','#eee3d3'],['Pale green','#e3eee7'],['Slate','#8d9ba6']];
 async async function studioPreset() {
   const p = S.cur; if (!p) return;
-  busy(true, 'Preparing spec sheet photo…');
-  try {
-    const log = [];
-    if (!await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
-    // Fail closed if the matte turns a visibly detailed subject into a black silhouette.
-    const src = await getPreview(p);
-    const matte = maskOf(p.edit);
-    const result = P.composeBackground(src, p.edit.bg, matte, S.assets);
-    const probe = document.createElement('canvas'); probe.width = 40; probe.height = 40;
-    const ctx = probe.getContext('2d', { willReadFrequently: true });
-    const pixels = (canvas) => { ctx.clearRect(0, 0, 40, 40); ctx.drawImage(canvas, 0, 0, 40, 40); return ctx.getImageData(0, 0, 40, 40).data; };
-    const before = pixels(src), after = pixels(result), alpha = pixels(matte);
-    let a = 0, b = 0, count = 0;
-    for (let i = 0; i < before.length; i += 4) if (alpha[i + 3] > 230) {
-      a += before[i] + before[i+1] + before[i+2];
-      b += after[i] + after[i+1] + after[i+2];
-      count++;
-    }
-    if (result !== src) P.freeCanvas(result);
-    if (count > 50 && a / count > 135 && b / count < 54) {
-      p.edit.bg.mode = 'none';
-      await renderBase();
-      toast('Background processing would hide mold details. Original photo preserved.', 7000);
-      return;
-    }
-    p.edit.adj = { ...P.DEFAULT_ADJ, sharpness: 8 };
-    p.edit.filter = 'none'; p.edit.auto = null;
-    // Compare rendered center against the unmodified photo. Never keep a darkened mold.
-    const original = await getPreview(p);
-    const output = P.render(original, p.edit, maskOf(p.edit), S.assets);
-    const cv = document.createElement('canvas'); cv.width = 48; cv.height = 48;
-    const cg = cv.getContext('2d', { willReadFrequently: true });
-    const sample = (img) => { cg.clearRect(0,0,48,48); cg.drawImage(img,0,0,48,48); return cg.getImageData(0,0,48,48).data; };
-    const orig = sample(original), edited = sample(output);
-    let os = 0, es = 0, n = 0;
-    for (let y = 12; y < 36; y++) for (let x = 12; x < 36; x++) {
-      const i = (y*48+x)*4;
-      os += orig[i]+orig[i+1]+orig[i+2];
-      es += edited[i]+edited[i+1]+edited[i+2]; n++;
-    }
-    if (output !== original) P.freeCanvas(output);
-    if (os/n > 105 && es < os * 0.48) {
-      p.edit.bg.mode = 'none';
-      p.edit.adj = { ...P.DEFAULT_ADJ };
-      await renderBase(); commit(); renderPanel();
-      toast('The studio background made the mold too dark. Original details restored. Stamp remains available.', 7000);
-      return;
-    }
-    await renderBase(); commit(); renderPanel();
-    toast('Dark charcoal studio look applied. Other colors are available below.');
-  } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
-  finally { busy(false); }
+  // Safe studio mode: do not run heavy segmentation automatically.
+  // Keep the original pixels visible; background removal is an explicit separate action.
+  p.edit.bg.mode = 'none';
+  p.edit.adj = { ...P.DEFAULT_ADJ, sharpness: 8 };
+  p.edit.filter = 'none';
+  p.edit.auto = null;
+  await renderBase();
+  commit();
+  renderPanel();
+  toast('Photo details preserved. Background removal is temporarily disabled in this preset while it is being repaired.');
 }
 
 function productNameStamp(pn) {
