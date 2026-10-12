@@ -6,7 +6,7 @@ import { icon, hydrateIcons } from './icons.js';
 import { EMOJI, SVG_STAMPS, svgUrl, emojiDataURL, FONTS, COLORS, GRADIENTS } from './stamps.js';
 
 // ---------------- tiny on-device debug log (no keys, no image data) ----------------
-const APP_VERSION = 'v15-recovery';
+const APP_VERSION = 'v16-restored';
 const DBG_KEY = 'photoapp.debug.v1';
 const DBG = {
   read() { try { return JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); } catch (e) { return []; } },
@@ -764,8 +764,8 @@ const PANELS = {
     $('#mAuto', pn).onclick = () => magicAuto();
     $('#mBg', pn).onclick = () => removeBg('precise');
     $('#mStudio', pn).onclick = () => studioPreset();
-    productNameStamp(pn);
     studioColorPicker(pn);
+    productNameStamp(pn);
     $('#mAll', pn).onclick = () => applyToAllSheet();
     $('#aiSet', pn).onclick = () => aiSettingsSheet();
     ['Make it brighter and more colorful', 'Black and white, square crop', 'Blur the background', 'Warm sunset look with a ☀️ stamp top right', 'Add “Best Day Ever” at the bottom', 'Remove the background and put a clean light-gray studio background behind'].forEach(x => {
@@ -890,18 +890,18 @@ async function computeMask(p, method) {
 }
 
 const STUDIO_COLORS = [['Light gray','#e6e6e6'],['White','#ffffff'],['Off-white','#f5f3ef'],['Medium gray','#bfc3c7'],['Charcoal','#353a40'],['Black','#101114'],['Pale blue','#e6f1fa'],['Sky blue','#b9daf4'],['Navy','#22364d'],['Soft beige','#eee3d3'],['Pale green','#e3eee7'],['Slate','#8d9ba6']];
-async async function studioPreset() {
+async function studioPreset() {
   const p = S.cur; if (!p) return;
-  // Safe studio mode: do not run heavy segmentation automatically.
-  // Keep the original pixels visible; background removal is an explicit separate action.
-  p.edit.bg.mode = 'none';
-  p.edit.adj = { ...P.DEFAULT_ADJ, sharpness: 8 };
-  p.edit.filter = 'none';
-  p.edit.auto = null;
-  await renderBase();
-  commit();
-  renderPanel();
-  toast('Photo details preserved. Background removal is temporarily disabled in this preset while it is being repaired.');
+  busy(true, 'Preparing spec sheet photo…');
+  try {
+    const log = [];
+    if (!await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
+    p.edit.adj.sharpness = 12;
+    p.edit.auto = null;
+    await renderBase(); commit(); renderPanel();
+    toast('Dark charcoal studio look applied. Other colors are available below.');
+  } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
+  finally { busy(false); }
 }
 
 function productNameStamp(pn) {
@@ -1399,7 +1399,7 @@ async function boot() {
   const assets = (await DB.all('assets')) || [];
   for (const a of assets) if (a.kind === 'stamp' && a.url) S.assets.set(a.id, { img: null, kind: 'stamp', url: a.url });
   renderGallery();
-  // Recovery release: pause offline caching while startup issues are diagnosed.
+  if ('serviceWorker' in navigator && location.protocol === 'https:' || location.hostname === 'localhost') navigator.serviceWorker?.register('sw.js').catch(e => console.warn('SW', e));
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files); });
   window.__ready = true;
