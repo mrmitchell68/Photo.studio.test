@@ -892,16 +892,28 @@ async function computeMask(p, method) {
 const STUDIO_COLORS = [['Light gray','#e6e6e6'],['White','#ffffff'],['Off-white','#f5f3ef'],['Medium gray','#bfc3c7'],['Charcoal','#353a40'],['Black','#101114'],['Pale blue','#e6f1fa'],['Sky blue','#b9daf4'],['Navy','#22364d'],['Soft beige','#eee3d3'],['Pale green','#e3eee7'],['Slate','#8d9ba6']];
 async function studioPreset() {
   const p = S.cur; if (!p) return;
+  const previous = clone(p.edit);
   busy(true, 'Preparing spec sheet photo…');
   try {
-    const log = [];
-    if (!await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
-    p.edit.adj.sharpness = 12;
+    // Keep the original mold exposure; never stack earlier darkening filters.
+    p.edit.adj = { ...P.DEFAULT_ADJ, sharpness: 6 };
     p.edit.auto = null;
-    await renderBase(); commit(); renderPanel();
-    toast('Dark charcoal studio look applied. Other colors are available below.');
-  } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
-  finally { busy(false); }
+    p.edit.filter = 'none';
+    const log = [];
+    const ok = await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log);
+    if (!ok) {
+      p.edit = previous;
+      toast((log[0] || 'Background removal could not safely preserve this mold.').replace(/^• /, ''), 6000);
+      return;
+    }
+    await renderBase();
+    commit();
+    renderPanel();
+    toast('Dark studio background applied. Check mold details before saving.');
+  } catch (e) {
+    p.edit = previous;
+    toast('Photo unchanged: ' + e.message, 6000);
+  } finally { busy(false); }
 }
 
 function productNameStamp(pn) {
