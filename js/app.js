@@ -890,7 +890,7 @@ async function computeMask(p, method) {
 }
 
 const STUDIO_COLORS = [['Light gray','#e6e6e6'],['White','#ffffff'],['Off-white','#f5f3ef'],['Medium gray','#bfc3c7'],['Charcoal','#353a40'],['Black','#101114'],['Pale blue','#e6f1fa'],['Sky blue','#b9daf4'],['Navy','#22364d'],['Soft beige','#eee3d3'],['Pale green','#e3eee7'],['Slate','#8d9ba6']];
-async function studioPreset() {
+async async function studioPreset() {
   const p = S.cur; if (!p) return;
   busy(true, 'Preparing spec sheet photo…');
   try {
@@ -917,8 +917,29 @@ async function studioPreset() {
       toast('Background processing would hide mold details. Original photo preserved.', 7000);
       return;
     }
-    p.edit.adj.sharpness = 12;
-    p.edit.auto = null;
+    p.edit.adj = { ...P.DEFAULT_ADJ, sharpness: 8 };
+    p.edit.filter = 'none'; p.edit.auto = null;
+    // Compare rendered center against the unmodified photo. Never keep a darkened mold.
+    const original = await getPreview(p);
+    const output = P.render(original, p.edit, maskOf(p.edit), S.assets);
+    const cv = document.createElement('canvas'); cv.width = 48; cv.height = 48;
+    const cg = cv.getContext('2d', { willReadFrequently: true });
+    const sample = (img) => { cg.clearRect(0,0,48,48); cg.drawImage(img,0,0,48,48); return cg.getImageData(0,0,48,48).data; };
+    const orig = sample(original), edited = sample(output);
+    let os = 0, es = 0, n = 0;
+    for (let y = 12; y < 36; y++) for (let x = 12; x < 36; x++) {
+      const i = (y*48+x)*4;
+      os += orig[i]+orig[i+1]+orig[i+2];
+      es += edited[i]+edited[i+1]+edited[i+2]; n++;
+    }
+    if (output !== original) P.freeCanvas(output);
+    if (os/n > 105 && es < os * 0.48) {
+      p.edit.bg.mode = 'none';
+      p.edit.adj = { ...P.DEFAULT_ADJ };
+      await renderBase(); commit(); renderPanel();
+      toast('The studio background made the mold too dark. Original details restored. Stamp remains available.', 7000);
+      return;
+    }
     await renderBase(); commit(); renderPanel();
     toast('Dark charcoal studio look applied. Other colors are available below.');
   } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
