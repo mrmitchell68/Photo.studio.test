@@ -765,6 +765,7 @@ const PANELS = {
     $('#mBg', pn).onclick = () => removeBg('precise');
     $('#mStudio', pn).onclick = () => studioPreset();
     studioColorPicker(pn);
+    productNameStamp(pn);
     $('#mAll', pn).onclick = () => applyToAllSheet();
     $('#aiSet', pn).onclick = () => aiSettingsSheet();
     ['Make it brighter and more colorful', 'Black and white, square crop', 'Blur the background', 'Warm sunset look with a ☀️ stamp top right', 'Add “Best Day Ever” at the bottom', 'Remove the background and put a clean light-gray studio background behind'].forEach(x => {
@@ -901,6 +902,37 @@ async function studioPreset() {
     toast('Dark charcoal studio look applied. Other colors are available below.');
   } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
   finally { busy(false); }
+}
+
+function productNameStamp(pn) {
+  const wrap = h('<div><div class="sec">Product Name Stamp</div><input id="productStampName" type="text" maxlength="100" placeholder="e.g. Norris Bunker Bar Mold" style="width:100%;margin:6px 0;padding:10px"><div class="row"><select id="productStampStyle" aria-label="Stamp style"><option value="border">Bordered stamp</option><option value="text">Simple text</option></select><select id="productStampSize" aria-label="Stamp size"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option></select></div><button class="chip primary" id="productStampAdd">Add lower-right stamp</button><p class="note">Stamp remains editable and can be moved or undone. Each photo gets its own name.</p></div>');
+  pn.appendChild(wrap);
+  $('#productStampAdd', wrap).onclick = () => {
+    const name = $('#productStampName', wrap).value.trim();
+    if (!name) { toast('Enter the product or mold name'); return; }
+    const bordered = $('#productStampStyle', wrap).value === 'border';
+    const sz = $('#productStampSize', wrap).value;
+    const d = P.outDims(S.cur.w, S.cur.h, S.cur.edit);
+    const fontSize = Math.max(18, Math.round(d.h * (sz === 'small' ? .025 : sz === 'large' ? .045 : .034)));
+    const label = new fabric.Textbox(name, { width: Math.min(d.w * .62, Math.max(d.w * .25, name.length * fontSize * .53)), fontSize, fontFamily: 'Arial', fontWeight: 'bold', fill: '#e2e2e2', textAlign: 'center', lineHeight: 1.05, originX: 'center', originY: 'center' });
+    label.initDimensions();
+    const pad = fontSize * .48;
+    const w = label.width + 2 * pad, hh = label.height + 2 * pad;
+    const parts = [];
+    if (bordered) parts.push(new fabric.Rect({ width: w, height: hh, left: -w/2, top: -hh/2, fill: 'rgba(24,24,24,0.40)', stroke: '#bcbcbc', strokeWidth: Math.max(1, fontSize * .055), rx: 3, ry: 3 }));
+    label.set({ left: 0, top: 0 });
+    parts.push(label);
+    const group = new fabric.Group(parts, { kind: 'stamp', name: 'Product Name Stamp', originX: 'center', originY: 'center' });
+    const maxWidth = d.w * .47;
+    const scale = Math.min(1, maxWidth / group.width, d.h * .16 / group.height);
+    group.set({ scaleX: scale, scaleY: scale, left: d.w - d.w * .035 - group.width * scale / 2, top: d.h - d.h * .035 - group.height * scale / 2 });
+    group.setCoords();
+    fc.add(group);
+    fc.setActiveObject(group);
+    fc.requestRenderAll();
+    commit();
+    toast('Product name stamp added. Drag to reposition.');
+  };
 }
 function studioColorPicker(pn) {
   const p = S.cur; if (!p) return;
