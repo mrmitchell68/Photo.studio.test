@@ -894,11 +894,11 @@ async function studioPreset() {
   busy(true, 'Preparing spec sheet photo…');
   try {
     const log = [];
-    if (!await applyBackground(p, { type: 'color', color: '#e6e6e6' }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
+    if (!await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
     p.edit.adj.sharpness = 12;
     p.edit.auto = null;
     await renderBase(); commit(); renderPanel();
-    toast('Professional Spec Sheet applied. Choose another color below.');
+    toast('Dark charcoal studio look applied. Other colors are available below.');
   } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
   finally { busy(false); }
 }
@@ -906,6 +906,15 @@ function studioColorPicker(pn) {
   const p = S.cur; if (!p) return;
   const box = h('<div><div class="sec">Studio background colors</div><div class="row" style="flex-wrap:wrap"></div><p class="note">Remove the background first, then select a color.</p></div>');
   const row = box.querySelector('.row');
+  const dark = document.createElement('button');
+  dark.className = 'chip';
+  dark.textContent = '★ Dark studio (default)';
+  dark.onclick = async () => {
+    if (!p.edit.bg.maskId) { toast('Tap Professional Spec Sheet first'); return; }
+    Object.assign(p.edit.bg, { mode: 'gradient', c1: '#464646', c2: '#1c1c1e', angle: 135 });
+    await renderBase(); commit(); renderPanel();
+  };
+  row.appendChild(dark);
   STUDIO_COLORS.forEach(([name, color]) => {
     const btn = document.createElement('button');
     btn.className = 'chip';
