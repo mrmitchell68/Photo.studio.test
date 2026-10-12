@@ -764,8 +764,8 @@ const PANELS = {
     $('#mAuto', pn).onclick = () => magicAuto();
     $('#mBg', pn).onclick = () => removeBg('precise');
     $('#mStudio', pn).onclick = () => studioPreset();
-    studioColorPicker(pn);
     productNameStamp(pn);
+    studioColorPicker(pn);
     $('#mAll', pn).onclick = () => applyToAllSheet();
     $('#aiSet', pn).onclick = () => aiSettingsSheet();
     ['Make it brighter and more colorful', 'Black and white, square crop', 'Blur the background', 'Warm sunset look with a ☀️ stamp top right', 'Add “Best Day Ever” at the bottom', 'Remove the background and put a clean light-gray studio background behind'].forEach(x => {
@@ -896,6 +896,27 @@ async function studioPreset() {
   try {
     const log = [];
     if (!await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
+    // Fail closed if the matte turns a visibly detailed subject into a black silhouette.
+    const src = await getPreview(p);
+    const matte = maskOf(p.edit);
+    const result = P.composeBackground(src, p.edit.bg, matte, S.assets);
+    const probe = document.createElement('canvas'); probe.width = 40; probe.height = 40;
+    const ctx = probe.getContext('2d', { willReadFrequently: true });
+    const pixels = (canvas) => { ctx.clearRect(0, 0, 40, 40); ctx.drawImage(canvas, 0, 0, 40, 40); return ctx.getImageData(0, 0, 40, 40).data; };
+    const before = pixels(src), after = pixels(result), alpha = pixels(matte);
+    let a = 0, b = 0, count = 0;
+    for (let i = 0; i < before.length; i += 4) if (alpha[i + 3] > 230) {
+      a += before[i] + before[i+1] + before[i+2];
+      b += after[i] + after[i+1] + after[i+2];
+      count++;
+    }
+    if (result !== src) P.freeCanvas(result);
+    if (count > 50 && a / count > 135 && b / count < 54) {
+      p.edit.bg.mode = 'none';
+      await renderBase();
+      toast('Background processing would hide mold details. Original photo preserved.', 7000);
+      return;
+    }
     p.edit.adj.sharpness = 12;
     p.edit.auto = null;
     await renderBase(); commit(); renderPanel();
