@@ -6,7 +6,7 @@ import { icon, hydrateIcons } from './icons.js';
 import { EMOJI, SVG_STAMPS, svgUrl, emojiDataURL, FONTS, COLORS, GRADIENTS } from './stamps.js';
 
 // ---------------- tiny on-device debug log (no keys, no image data) ----------------
-const APP_VERSION = 'v16-restored';
+const APP_VERSION = 'v17-release-candidate';
 const DBG_KEY = 'photoapp.debug.v1';
 const DBG = {
   read() { try { return JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); } catch (e) { return []; } },
@@ -949,6 +949,7 @@ async function studioPreset() {
     toast('Dark studio background applied. Check mold details before saving.');
   } catch (e) {
     p.edit = previous;
+    try { await renderBase(); } catch (_) {}
     toast('Photo unchanged: ' + e.message, 6000);
   } finally { busy(false); }
 }
