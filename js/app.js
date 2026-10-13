@@ -6,7 +6,7 @@ import { icon, hydrateIcons } from './icons.js';
 import { EMOJI, SVG_STAMPS, svgUrl, emojiDataURL, FONTS, COLORS, GRADIENTS } from './stamps.js';
 
 // ---------------- tiny on-device debug log (no keys, no image data) ----------------
-const APP_VERSION = 'v16-restored';
+const APP_VERSION = 'v17-release-candidate';
 const DBG_KEY = 'photoapp.debug.v1';
 const DBG = {
   read() { try { return JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); } catch (e) { return []; } },
@@ -892,16 +892,66 @@ async function computeMask(p, method) {
 const STUDIO_COLORS = [['Light gray','#e6e6e6'],['White','#ffffff'],['Off-white','#f5f3ef'],['Medium gray','#bfc3c7'],['Charcoal','#353a40'],['Black','#101114'],['Pale blue','#e6f1fa'],['Sky blue','#b9daf4'],['Navy','#22364d'],['Soft beige','#eee3d3'],['Pale green','#e3eee7'],['Slate','#8d9ba6']];
 async function studioPreset() {
   const p = S.cur; if (!p) return;
+  const previous = clone(p.edit);
   busy(true, 'Preparing spec sheet photo…');
   try {
-    const log = [];
-    if (!await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log)) { toast((log[0] || 'Background removal failed').replace(/^• /, ''), 5000); return; }
-    p.edit.adj.sharpness = 12;
+    // Keep the original mold exposure; never stack earlier darkening filters.
+    p.edit.adj = { ...P.DEFAULT_ADJ, sharpness: 6 };
     p.edit.auto = null;
-    await renderBase(); commit(); renderPanel();
-    toast('Dark charcoal studio look applied. Other colors are available below.');
-  } catch (e) { toast('Spec Sheet enhancement failed: ' + e.message, 5000); }
-  finally { busy(false); }
+    p.edit.filter = 'none';
+    const log = [];
+    const ok = await applyBackground(p, { type: 'gradient', color1: '#464646', color2: '#1c1c1e', angle: 135 }, log);
+    if (!ok) {
+      p.edit = previous;
+      toast((log[0] || 'Background removal could not safely preserve this mold.').replace(/^• /, ''), 6000);
+      return;
+    }
+    // Inspect only a tiny 48px preview: inexpensive even on older phones.
+    // Refuse any render that destroys brightness inside confidently kept subject pixels.
+    const src = await getPreview(p);
+    const mask = maskOf(p.edit);
+    if (mask) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 48;
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      const sample = (img) => {
+        cx.clearRect(0, 0, 48, 48);
+        cx.drawImage(img, 0, 0, 48, 48);
+        return cx.getImageData(0, 0, 48, 48).data;
+      };
+      const original = sample(src);
+      const alpha = sample(mask);
+      // Use the same compositing code as export, but only at thumbnail scale.
+      const thumb = P.makeCanvas(48, 48);
+      thumb.getContext('2d').drawImage(src, 0, 0, 48, 48);
+      const smallMask = P.makeCanvas(48, 48);
+      smallMask.getContext('2d').drawImage(mask, 0, 0, 48, 48);
+      const comp = P.composeBackground(thumb, p.edit.bg, smallMask, S.assets);
+      const finalPixels = sample(comp);
+      let beforeLight = 0, afterLight = 0, n = 0;
+      for (let i = 0; i < original.length; i += 4) {
+        if (alpha[i + 3] < 240) continue;
+        beforeLight += original[i] + original[i+1] + original[i+2];
+        afterLight += finalPixels[i] + finalPixels[i+1] + finalPixels[i+2];
+        n++;
+      }
+      if (comp !== thumb) P.freeCanvas(comp);
+      P.freeCanvas(thumb); P.freeCanvas(smallMask);
+      if (n > 100 && beforeLight > n * 105 && afterLight < beforeLight * 0.65) {
+        p.edit = previous;
+        toast('Mold detail protection stopped an overly dark edit. Original preserved.', 7000);
+        return;
+      }
+    }
+    await renderBase();
+    commit();
+    renderPanel();
+    toast('Dark studio background applied. Check mold details before saving.');
+  } catch (e) {
+    p.edit = previous;
+    try { await renderBase(); } catch (_) {}
+    toast('Photo unchanged: ' + e.message, 6000);
+  } finally { busy(false); }
 }
 
 function productNameStamp(pn) {
