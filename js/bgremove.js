@@ -208,6 +208,16 @@ export async function segment(canvas, method = 'precise', progress) {
       : 'Could not separate a subject from the background';
     const err = new Error(msg); err.code = 'NO_SUBJECT'; throw err;
   }
+  // Industrial product safeguard: reject masks that discard most of the center
+  // or produce an implausibly small cutout. Do not modify the source image.
+  // A rejection is safer than exporting a missing or silhouetted mold.
+  if (used === 'precise' && (st.coverage < 0.12 || (st.center < 0.18 && st.coverage < 0.45))) {
+    note('industrial product safety rejection: too little foreground retained');
+    freeCanvas(m);
+    const err = new Error('Background removal could not safely preserve the mold. Original photo unchanged.');
+    err.code = 'UNSAFE_PRODUCT_MASK';
+    throw err;
+  }
   m.method = used; m.stats = st;
   return m;
 }
