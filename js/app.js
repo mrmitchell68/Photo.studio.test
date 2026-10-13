@@ -906,6 +906,43 @@ async function studioPreset() {
       toast((log[0] || 'Background removal could not safely preserve this mold.').replace(/^• /, ''), 6000);
       return;
     }
+    // Inspect only a tiny 48px preview: inexpensive even on older phones.
+    // Refuse any render that destroys brightness inside confidently kept subject pixels.
+    const src = await getPreview(p);
+    const mask = maskOf(p.edit);
+    if (mask) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 48;
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      const sample = (img) => {
+        cx.clearRect(0, 0, 48, 48);
+        cx.drawImage(img, 0, 0, 48, 48);
+        return cx.getImageData(0, 0, 48, 48).data;
+      };
+      const original = sample(src);
+      const alpha = sample(mask);
+      // Use the same compositing code as export, but only at thumbnail scale.
+      const thumb = P.makeCanvas(48, 48);
+      thumb.getContext('2d').drawImage(src, 0, 0, 48, 48);
+      const smallMask = P.makeCanvas(48, 48);
+      smallMask.getContext('2d').drawImage(mask, 0, 0, 48, 48);
+      const comp = P.composeBackground(thumb, p.edit.bg, smallMask, S.assets);
+      const finalPixels = sample(comp);
+      let beforeLight = 0, afterLight = 0, n = 0;
+      for (let i = 0; i < original.length; i += 4) {
+        if (alpha[i + 3] < 240) continue;
+        beforeLight += original[i] + original[i+1] + original[i+2];
+        afterLight += finalPixels[i] + finalPixels[i+1] + finalPixels[i+2];
+        n++;
+      }
+      if (comp !== thumb) P.freeCanvas(comp);
+      P.freeCanvas(thumb); P.freeCanvas(smallMask);
+      if (n > 100 && beforeLight > n * 105 && afterLight < beforeLight * 0.65) {
+        p.edit = previous;
+        toast('Mold detail protection stopped an overly dark edit. Original preserved.', 7000);
+        return;
+      }
+    }
     await renderBase();
     commit();
     renderPanel();
